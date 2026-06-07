@@ -102,7 +102,7 @@
 <footer>EmoScan Live · IDEMIA Internship — Shaurya Singh</footer>
 
 <script>
-  const video       = document.getElementById('video');
+ const video       = document.getElementById('video');
   const canvas      = document.getElementById('canvas');
   const outputImg   = document.getElementById('output-img');
   const btnStart    = document.getElementById('btn-start');
@@ -116,7 +116,7 @@
   const fpsDisp     = document.getElementById('fps-display');
   const facesDisp   = document.getElementById('faces-display');
 
-  let stream = null, running = false;
+  let stream = null, running = false, processing = false;
   let lastTime = performance.now(), frameCount = 0;
 
   btnStart.addEventListener('click', async () => {
@@ -129,7 +129,7 @@
       btnStart.disabled = true;
       btnStop.disabled = false;
       statusText.textContent = '● LIVE';
-      sendFrame();
+      requestAnimationFrame(loop);
     } catch (e) { alert('Camera error: ' + e.message); }
   });
 
@@ -148,12 +148,39 @@
     fpsDisp.textContent = 'FPS: —'; facesDisp.textContent = 'Faces: —';
   });
 
-  async function sendFrame() {
+  let lastSent = 0;
+  const SEND_INTERVAL = 800; // send to server every 800ms
+
+  function loop(timestamp) {
     if (!running) return;
-    canvas.width  = video.videoWidth  || 640;
-    canvas.height = video.videoHeight || 480;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    const frameData = canvas.toDataURL('image/jpeg', 0.7);
+
+    // Always draw live video to canvas
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width  = video.videoWidth  || 640;
+      canvas.height = video.videoHeight || 480;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+    }
+
+    // Send to server every SEND_INTERVAL ms
+    if (!processing && timestamp - lastSent > SEND_INTERVAL) {
+      lastSent = timestamp;
+      const frameData = canvas.toDataURL('image/jpeg', 0.6);
+      sendToServer(frameData);
+    }
+
+    // FPS counter
+    frameCount++;
+    const now = performance.now();
+    if (now - lastTime >= 1000) {
+      fpsDisp.textContent = `FPS: ${frameCount}`;
+      frameCount = 0; lastTime = now;
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  async function sendToServer(frameData) {
+    processing = true;
     try {
       const res  = await fetch('/predict_frame', {
         method: 'POST',
@@ -162,6 +189,7 @@
       });
       const data = await res.json();
       if (!data.error) {
+        // Show annotated frame overlaid on live video
         outputImg.src = data.annotated_frame;
         outputImg.style.display = 'block';
         video.style.display = 'none';
@@ -180,13 +208,7 @@
         }
       }
     } catch (_) {}
-    frameCount++;
-    const now = performance.now();
-    if (now - lastTime >= 1000) {
-      fpsDisp.textContent = `FPS: ${frameCount}`;
-      frameCount = 0; lastTime = now;
-    }
-    setTimeout(sendFrame, 300);
+    processing = false;
   }
 </script>
 </body>
