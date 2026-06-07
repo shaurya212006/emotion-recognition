@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EmoScan — Live Webcam</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #08090c; --surface: #111318; --border: #1e2130;
+      --happy:   #38e07b; --sad: #4a8cff; --text: #e8eaf0;
+      --muted:   #5a5f75; --accent: #f0c040;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Syne', sans-serif; min-height: 100vh; }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.5rem 3rem; border-bottom: 1px solid var(--border);
+    }
+    .logo { font-size: 1.4rem; font-weight: 800; }
+    .logo span { color: var(--accent); }
+    nav a { font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; color: var(--muted); text-decoration: none; margin-left: 2rem; }
+    nav a:hover { color: var(--text); }
+    .layout {
+      display: grid; grid-template-columns: 1fr 320px;
+      gap: 1.5rem; max-width: 1100px; margin: 2.5rem auto; padding: 0 2rem;
+    }
+    .cam-wrap { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    #video { display: block; width: 100%; }
+    #canvas { display: none; }
+    #output-img { display: none; width: 100%; }
+    .cam-overlay { position: absolute; bottom: 1rem; left: 1rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: var(--accent); }
+    .sidebar { display: flex; flex-direction: column; gap: 1rem; }
+    .btn {
+      width: 100%; padding: .85rem;
+      font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700;
+      border-radius: 8px; border: none; cursor: pointer; transition: opacity .2s;
+    }
+    .btn-start { background: var(--accent); color: var(--bg); }
+    .btn-stop  { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.2rem 1.4rem; }
+    .stat-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: .5rem; }
+    .big-emotion { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; }
+    .big-emotion.happy { color: var(--happy); }
+    .big-emotion.sad   { color: var(--sad); }
+    .big-emotion.none  { color: var(--muted); font-size: 1.2rem; font-weight: 400; }
+    .bar-row { display: flex; align-items: center; gap: .8rem; margin-bottom: .4rem; }
+    .bar-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; width: 50px; color: var(--muted); }
+    .bar-track { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .bar-fill  { height: 100%; border-radius: 3px; transition: width .3s ease; }
+    .bar-fill.happy { background: var(--happy); }
+    .bar-fill.sad   { background: var(--sad); }
+    .bar-pct { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; width: 38px; text-align: right; }
+    .fps-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: var(--muted); text-align: right; }
+    footer { border-top: 1px solid var(--border); text-align: center; padding: 2rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: var(--muted); margin-top: 3rem; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo">Emo<span>Scan</span></div>
+  <nav><a href="/">Upload</a><a href="/webcam">Live Webcam</a></nav>
+</header>
+
+<div class="layout">
+  <div class="cam-wrap">
+    <video id="video" autoplay muted playsinline></video>
+    <canvas id="canvas"></canvas>
+    <img id="output-img" alt="annotated" />
+    <div class="cam-overlay" id="status-text">Camera off</div>
+  </div>
+
+  <div class="sidebar">
+    <button class="btn btn-start" id="btn-start">Start Camera</button>
+    <button class="btn btn-stop"  id="btn-stop" disabled>Stop</button>
+    <div class="stat-box">
+      <div class="stat-label">Current Emotion</div>
+      <div class="big-emotion none" id="emotion-display">—</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Probabilities</div>
+      <div class="bar-row">
+        <span class="bar-label">Happy</span>
+        <div class="bar-track"><div class="bar-fill happy" id="bar-happy" style="width:0%"></div></div>
+        <span class="bar-pct" id="pct-happy">—</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">Sad</span>
+        <div class="bar-track"><div class="bar-fill sad" id="bar-sad" style="width:0%"></div></div>
+        <span class="bar-pct" id="pct-sad">—</span>
+      </div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Stats</div>
+      <div class="fps-label" id="fps-display">FPS: —</div>
+      <div class="fps-label" id="faces-display">Faces: —</div>
+    </div>
+  </div>
+</div>
+
+<footer>EmoScan Live · IDEMIA Internship — Shaurya Singh</footer>
+
+<script>
+  const video       = document.getElementById('video');
+  const canvas      = document.getElementById('canvas');
+  const outputImg   = document.getElementById('output-img');
+  const btnStart    = document.getElementById('btn-start');
+  const btnStop     = document.getElementById('btn-stop');
+  const statusText  = document.getElementById('status-text');
+  const emotionDisp = document.getElementById('emotion-display');
+  const barHappy    = document.getElementById('bar-happy');
+  const barSad      = document.getElementById('bar-sad');
+  const pctHappy    = document.getElementById('pct-happy');
+  const pctSad      = document.getElementById('pct-sad');
+  const fpsDisp     = document.getElementById('fps-display');
+  const facesDisp   = document.getElementById('faces-display');
+
+  let stream = null, running = false;
+  let lastTime = performance.now(), frameCount = 0;
+
+  btnStart.addEventListener('click', async () => {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+      video.style.display = 'block';
+      outputImg.style.display = 'none';
+      running = true;
+      btnStart.disabled = true;
+      btnStop.disabled = false;
+      statusText.textContent = '● LIVE';
+      sendFrame();
+    } catch (e) { alert('Camera error: ' + e.message); }
+  });
+
+  btnStop.addEventListener('click', () => {
+    running = false;
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    video.style.display = 'block';
+    outputImg.style.display = 'none';
+    btnStart.disabled = false;
+    btnStop.disabled = true;
+    statusText.textContent = 'Camera off';
+    emotionDisp.textContent = '—';
+    emotionDisp.className = 'big-emotion none';
+    barHappy.style.width = '0%'; barSad.style.width = '0%';
+    pctHappy.textContent = '—'; pctSad.textContent = '—';
+    fpsDisp.textContent = 'FPS: —'; facesDisp.textContent = 'Faces: —';
+  });
+
+  async function sendFrame() {
+    if (!running) return;
+    canvas.width  = video.videoWidth  || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const frameData = canvas.toDataURL('image/jpeg', 0.7);
+    try {
+      const res  = await fetch('/predict_frame', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ frame: frameData }),
+      });
+      const data = await res.json();
+      if (!data.error) {
+        outputImg.src = data.annotated_frame;
+        outputImg.style.display = 'block';
+        video.style.display = 'none';
+        facesDisp.textContent = `Faces: ${data.faces_found}`;
+        if (data.faces_found > 0) {
+          const r = data.results[0];
+          emotionDisp.textContent = r.label;
+          emotionDisp.className = `big-emotion ${r.label.toLowerCase()}`;
+          const h = (r.probs.Happy * 100).toFixed(0);
+          const s = (r.probs.Sad   * 100).toFixed(0);
+          barHappy.style.width = h + '%'; pctHappy.textContent = h + '%';
+          barSad.style.width   = s + '%'; pctSad.textContent   = s + '%';
+        } else {
+          emotionDisp.textContent = 'No face';
+          emotionDisp.className = 'big-emotion none';
+        }
+      }
+    } catch (_) {}
+    frameCount++;
+    const now = performance.now();
+    if (now - lastTime >= 1000) {
+      fpsDisp.textContent = `FPS: ${frameCount}`;
+      frameCount = 0; lastTime = now;
+    }
+    setTimeout(sendFrame, 300);
+  }
+</script>
+</body>
+</html>

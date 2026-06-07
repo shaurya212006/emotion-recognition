@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EmoScan — Facial Emotion Recognition</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #08090c;
+      --surface: #111318;
+      --border:  #1e2130;
+      --happy:   #38e07b;
+      --sad:     #4a8cff;
+      --text:    #e8eaf0;
+      --muted:   #5a5f75;
+      --accent:  #f0c040;
+    }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Syne', sans-serif; min-height: 100vh;
+    }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.5rem 3rem; border-bottom: 1px solid var(--border);
+    }
+    .logo { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.03em; }
+    .logo span { color: var(--accent); }
+    nav a {
+      font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem;
+      color: var(--muted); text-decoration: none; margin-left: 2rem;
+      transition: color .2s;
+    }
+    nav a:hover { color: var(--text); }
+    .hero {
+      max-width: 960px; margin: 0 auto;
+      padding: 5rem 2rem 3rem; text-align: center;
+    }
+    .hero-tag {
+      display: inline-block;
+      font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem;
+      color: var(--accent); letter-spacing: .15em; text-transform: uppercase;
+      border: 1px solid var(--accent); border-radius: 2px;
+      padding: .25rem .7rem; margin-bottom: 2rem;
+    }
+    h1 { font-size: clamp(2.4rem,6vw,4.5rem); font-weight: 800; line-height: 1.05; letter-spacing: -0.04em; }
+    h1 em { font-style: normal; color: var(--happy); }
+    .subtitle { margin-top: 1.2rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.9rem; color: var(--muted); line-height: 1.7; }
+    .modes {
+      display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap;
+      margin: 3rem auto 0; max-width: 800px; padding: 0 2rem;
+    }
+    .mode-card {
+      flex: 1; min-width: 220px; max-width: 340px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 2rem 1.5rem;
+      cursor: pointer; transition: border-color .25s, transform .25s;
+      text-decoration: none; color: inherit;
+    }
+    .mode-card:hover { border-color: var(--accent); transform: translateY(-3px); }
+    .mode-icon { font-size: 2.4rem; margin-bottom: 1rem; }
+    .mode-card h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: .5rem; }
+    .mode-card p { font-size: 0.82rem; color: var(--muted); line-height: 1.6; }
+    #upload-section { max-width: 780px; margin: 4rem auto; padding: 0 2rem; }
+    .section-title {
+      font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 1.5rem;
+    }
+    .dropzone {
+      border: 2px dashed var(--border); border-radius: 12px;
+      padding: 3rem 2rem; text-align: center; cursor: pointer;
+      transition: border-color .25s, background .25s;
+    }
+    .dropzone.drag-over { border-color: var(--accent); background: rgba(240,192,64,.04); }
+    .dropzone input[type=file] { display: none; }
+    .dropzone-label { font-size: 0.9rem; color: var(--muted); line-height: 1.8; }
+    .dropzone-label strong { color: var(--accent); cursor: pointer; }
+    .btn-predict {
+      display: block; width: 100%; margin-top: 1rem;
+      background: var(--accent); color: var(--bg);
+      font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700;
+      border: none; border-radius: 8px; padding: .85rem;
+      cursor: pointer; transition: opacity .2s;
+    }
+    .btn-predict:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-predict:not(:disabled):hover { opacity: .88; }
+    #preview-container { margin-top: 1.5rem; display: none; }
+    #preview-img { width: 100%; border-radius: 10px; border: 1px solid var(--border); }
+    #results { margin-top: 1.5rem; display: none; }
+    .result-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1.2rem 1.4rem; margin-bottom: 1rem;
+    }
+    .result-header { display: flex; align-items: center; gap: .75rem; margin-bottom: .8rem; }
+    .emotion-badge {
+      font-size: 0.78rem; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; padding: .2rem .6rem; border-radius: 4px;
+    }
+    .emotion-badge.happy { background: rgba(56,224,123,.15); color: var(--happy); }
+    .emotion-badge.sad   { background: rgba(74,140,255,.15); color: var(--sad); }
+    .face-id { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; color: var(--muted); }
+    .bar-row { display: flex; align-items: center; gap: .8rem; margin-bottom: .4rem; }
+    .bar-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; width: 50px; color: var(--muted); }
+    .bar-track { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 3px; transition: width .6s ease; }
+    .bar-fill.happy { background: var(--happy); }
+    .bar-fill.sad   { background: var(--sad); }
+    .bar-pct { font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; width: 42px; text-align: right; }
+    .no-face { text-align: center; padding: 2rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; color: var(--muted); }
+    #spinner { display: none; text-align: center; padding: 2rem; font-family: 'IBM Plex Mono', monospace; font-size: 0.82rem; color: var(--muted); }
+    .spin {
+      display: inline-block; width: 20px; height: 20px;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin .8s linear infinite; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    footer {
+      border-top: 1px solid var(--border); text-align: center;
+      padding: 2rem; font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.72rem; color: var(--muted); margin-top: 6rem;
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo">Emo<span>Scan</span></div>
+  <nav>
+    <a href="/">Upload</a>
+    <a href="/webcam">Live Webcam</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="hero-tag">CNN · OpenCV · FER-2013</div>
+    <h1>Detect emotions<br>from <em>faces</em></h1>
+    <p class="subtitle">Upload an image or use your webcam.<br>The model predicts Happy or Sad using a lightweight CNN.</p>
+  </section>
+
+  <div class="modes">
+    <a class="mode-card" href="#upload-section">
+      <div class="mode-icon">🖼️</div>
+      <h3>Image Upload</h3>
+      <p>Drop any photo. The system detects all faces and predicts each emotion instantly.</p>
+    </a>
+    <a class="mode-card" href="/webcam">
+      <div class="mode-icon">📷</div>
+      <h3>Live Webcam</h3>
+      <p>Real-time emotion detection from your browser's camera feed, frame by frame.</p>
+    </a>
+  </div>
+
+  <section id="upload-section">
+    <p class="section-title">// Image Upload</p>
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp" />
+      <div class="dropzone-label">
+        Drag & drop an image here, or <strong onclick="document.getElementById('file-input').click()">browse</strong><br>
+        <small>PNG · JPEG · WEBP — max 10 MB</small>
+      </div>
+    </div>
+    <div id="preview-container"><img id="preview-img" src="" alt="preview" /></div>
+    <button class="btn-predict" id="btn-predict" disabled>Analyse Emotions</button>
+    <div id="spinner"><span class="spin"></span>&nbsp; Detecting faces & predicting…</div>
+    <div id="results"></div>
+  </section>
+</main>
+
+<footer>Built for IDEMIA Internship — Shaurya Singh · Emotion Recognition Prototype</footer>
+
+<script>
+  const dropzone    = document.getElementById('dropzone');
+  const fileInput   = document.getElementById('file-input');
+  const previewImg  = document.getElementById('preview-img');
+  const previewCont = document.getElementById('preview-container');
+  const btnPredict  = document.getElementById('btn-predict');
+  const spinner     = document.getElementById('spinner');
+  const resultsDiv  = document.getElementById('results');
+  let selectedFile  = null;
+
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault(); dropzone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  dropzone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+  function handleFile(file) {
+    selectedFile = file;
+    previewImg.src = URL.createObjectURL(file);
+    previewCont.style.display = 'block';
+    btnPredict.disabled = false;
+    resultsDiv.style.display = 'none';
+  }
+
+  btnPredict.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    spinner.style.display = 'block';
+    resultsDiv.style.display = 'none';
+    btnPredict.disabled = true;
+    const formData = new FormData();
+    formData.append('image', selectedFile);
+    try {
+      const res  = await fetch('/predict', { method: 'POST', body: formData });
+      const data = await res.json();
+      spinner.style.display = 'none';
+      btnPredict.disabled = false;
+      if (data.error) { showError(data.error); return; }
+      previewImg.src = data.annotated_image;
+      resultsDiv.innerHTML = data.faces_found === 0
+        ? `<div class="no-face">😶 No face detected. Try a clearer, frontal photo.</div>`
+        : data.results.map((r, i) => buildCard(r, i + 1)).join('');
+      resultsDiv.style.display = 'block';
+    } catch (err) {
+      spinner.style.display = 'none';
+      btnPredict.disabled = false;
+      showError('Server error — make sure Flask app is running.');
+    }
+  });
+
+  function buildCard(r, idx) {
+    const cls  = r.label.toLowerCase();
+    const hPct = (r.probs.Happy * 100).toFixed(1);
+    const sPct = (r.probs.Sad   * 100).toFixed(1);
+    return `
+      <div class="result-card">
+        <div class="result-header">
+          <span class="emotion-badge ${cls}">${r.label}</span>
+          <span class="face-id">face #${idx} · ${(r.confidence*100).toFixed(1)}% confidence</span>
+        </div>
+        <div class="bar-row">
+          <span class="bar-label">Happy</span>
+          <div class="bar-track"><div class="bar-fill happy" style="width:${hPct}%"></div></div>
+          <span class="bar-pct">${hPct}%</span>
+        </div>
+        <div class="bar-row">
+          <span class="bar-label">Sad</span>
+          <div class="bar-track"><div class="bar-fill sad" style="width:${sPct}%"></div></div>
+          <span class="bar-pct">${sPct}%</span>
+        </div>
+      </div>`;
+  }
+
+  function showError(msg) {
+    resultsDiv.innerHTML = `<div class="no-face">⚠️ ${msg}</div>`;
+    resultsDiv.style.display = 'block';
+  }
+</script>
+</body>
+</html>
