@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EmoScan — Records &amp; Logs</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--bg:#08090c;--surface:#111318;--border:#1e2130;--happy:#38e07b;--sad:#4a8cff;--text:#e8eaf0;--muted:#5a5f75;--accent:#f0c040}
+    body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh}
+    header{display:flex;align-items:center;justify-content:space-between;padding:1.2rem 3rem;border-bottom:1px solid var(--border)}
+    .logo{font-size:1.4rem;font-weight:800;letter-spacing:-0.03em}.logo span{color:var(--accent)}
+    nav{display:flex;gap:0.3rem}
+    nav a{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--muted);text-decoration:none;padding:.45rem .9rem;border-radius:6px;border:1px solid transparent;transition:all .2s}
+    nav a:hover{color:var(--text);border-color:var(--border)}
+    nav a.active{color:var(--accent);border-color:var(--accent);background:rgba(240,192,64,.07)}
+    .page{max-width:1000px;margin:0 auto;padding:2.5rem 2rem}
+    .page-header{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:2rem;flex-wrap:wrap;gap:1rem}
+    .page-title{font-size:2rem;font-weight:800;letter-spacing:-0.03em}
+    .page-title span{color:var(--accent)}
+    .page-sub{font-family:'IBM Plex Mono',monospace;font-size:0.8rem;color:var(--muted);margin-top:.3rem}
+    .btn-clear{background:transparent;color:#ff6b6b;font-family:'IBM Plex Mono',monospace;font-size:0.78rem;border:1px solid #ff6b6b;border-radius:6px;padding:.4rem .9rem;cursor:pointer;transition:all .2s}
+    .btn-clear:hover{background:rgba(255,107,107,.1)}
+    .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:2rem}
+    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.1rem 1.2rem}
+    .stat-card .label{font-family:'IBM Plex Mono',monospace;font-size:0.68rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.4rem}
+    .stat-card .value{font-size:1.8rem;font-weight:800;letter-spacing:-0.02em}
+    .stat-card .value.happy{color:var(--happy)}.stat-card .value.sad{color:var(--sad)}.stat-card .value.accent{color:var(--accent)}
+    .filters{display:flex;gap:.6rem;margin-bottom:1.4rem;flex-wrap:wrap}
+    .filter-btn{font-family:'IBM Plex Mono',monospace;font-size:0.75rem;padding:.35rem .8rem;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .2s}
+    .filter-btn:hover{border-color:var(--accent);color:var(--accent)}
+    .filter-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(240,192,64,.08)}
+    .log-table{width:100%;border-collapse:collapse}
+    .log-table th{font-family:'IBM Plex Mono',monospace;font-size:0.68rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);padding:.7rem 1rem;text-align:left;border-bottom:1px solid var(--border)}
+    .log-table td{padding:.75rem 1rem;border-bottom:1px solid rgba(30,33,48,.6);font-size:0.85rem;vertical-align:top}
+    .log-table tr:hover td{background:var(--surface)}
+    .badge{display:inline-block;font-size:0.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:.15rem .5rem;border-radius:4px}
+    .badge.happy{background:rgba(56,224,123,.15);color:var(--happy)}
+    .badge.sad{background:rgba(74,140,255,.15);color:var(--sad)}
+    .badge.upload{background:rgba(240,192,64,.12);color:var(--accent)}
+    .badge.webcam{background:rgba(160,100,255,.12);color:#a064ff}
+    .ts{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--muted)}
+    .conf{font-family:'IBM Plex Mono',monospace;font-size:0.78rem;color:var(--text)}
+    .empty{text-align:center;padding:4rem;font-family:'IBM Plex Mono',monospace;font-size:0.85rem;color:var(--muted)}
+    .loading{text-align:center;padding:3rem;font-family:'IBM Plex Mono',monospace;font-size:0.82rem;color:var(--muted)}
+    .spin{display:inline-block;width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    footer{border-top:1px solid var(--border);text-align:center;padding:1.8rem;font-family:'IBM Plex Mono',monospace;font-size:0.7rem;color:var(--muted);margin-top:3rem}
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo">Emo<span>Scan</span></div>
+  <nav>
+    <a href="/">Upload</a>
+    <a href="/webcam">Live Webcam</a>
+    <a href="/records" class="active">Records &amp; Logs</a>
+  </nav>
+</header>
+
+<div class="page">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Records <span>&amp;</span> Logs</div>
+      <div class="page-sub">All detection sessions · newest first</div>
+    </div>
+    <button class="btn-clear" onclick="clearLogs()">🗑 Clear All Logs</button>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card"><div class="label">Total Sessions</div><div class="value accent" id="st-total">—</div></div>
+    <div class="stat-card"><div class="label">Happy Detections</div><div class="value happy" id="st-happy">—</div></div>
+    <div class="stat-card"><div class="label">Sad Detections</div><div class="value sad" id="st-sad">—</div></div>
+    <div class="stat-card"><div class="label">Webcam Sessions</div><div class="value" id="st-webcam">—</div></div>
+    <div class="stat-card"><div class="label">Upload Sessions</div><div class="value" id="st-upload">—</div></div>
+  </div>
+
+  <div class="filters">
+    <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+    <button class="filter-btn" onclick="setFilter('webcam',this)">Webcam Only</button>
+    <button class="filter-btn" onclick="setFilter('upload',this)">Upload Only</button>
+    <button class="filter-btn" onclick="setFilter('happy',this)">Happy Results</button>
+    <button class="filter-btn" onclick="setFilter('sad',this)">Sad Results</button>
+  </div>
+
+  <div id="log-container">
+    <div class="loading"><span class="spin"></span>&nbsp; Loading logs…</div>
+  </div>
+</div>
+
+<footer>EmoScan v2 · Records &amp; Logs · Last 500 sessions stored · IDEMIA Internship — Shaurya Singh</footer>
+
+<script>
+  let allLogs = [];
+  let currentFilter = 'all';
+
+  async function loadStats() {
+    try {
+      const res  = await fetch('/api/stats');
+      const data = await res.json();
+      document.getElementById('st-total').textContent  = data.total_sessions;
+      document.getElementById('st-happy').textContent  = data.happy_detections;
+      document.getElementById('st-sad').textContent    = data.sad_detections;
+      document.getElementById('st-webcam').textContent = data.webcam_sessions;
+      document.getElementById('st-upload').textContent = data.upload_sessions;
+    } catch(_) {}
+  }
+
+  async function loadLogs() {
+    try {
+      const res = await fetch('/api/logs');
+      allLogs   = await res.json();
+      renderLogs();
+    } catch(_) {
+      document.getElementById('log-container').innerHTML = '<div class="empty">⚠️ Could not load logs.</div>';
+    }
+  }
+
+  function setFilter(f, btn) {
+    currentFilter = f;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderLogs();
+  }
+
+  function renderLogs() {
+    let filtered = allLogs;
+    if (currentFilter === 'webcam') filtered = allLogs.filter(l => l.source === 'webcam');
+    else if (currentFilter === 'upload') filtered = allLogs.filter(l => l.source === 'upload');
+    else if (currentFilter === 'happy')  filtered = allLogs.filter(l => l.predictions.some(p => p.label === 'Happy'));
+    else if (currentFilter === 'sad')    filtered = allLogs.filter(l => l.predictions.some(p => p.label === 'Sad'));
+
+    if (filtered.length === 0) {
+      document.getElementById('log-container').innerHTML = '<div class="empty">📭 No records found.</div>';
+      return;
+    }
+
+    const rows = filtered.map(l => {
+      const preds = l.predictions.map(p =>
+        `<span class="badge ${p.label.toLowerCase()}">${p.label}</span> <span class="conf">${p.confidence}%</span>`
+      ).join('&nbsp;&nbsp;');
+      return `<tr>
+        <td><span class="ts">${l.timestamp}</span></td>
+        <td><span class="badge ${l.source}">${l.source}</span></td>
+        <td>${l.faces_found}</td>
+        <td>${preds || '<span style="color:var(--muted)">—</span>'}</td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('log-container').innerHTML = `
+      <table class="log-table">
+        <thead><tr>
+          <th>Timestamp</th>
+          <th>Source</th>
+          <th>Faces</th>
+          <th>Predictions</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  async function clearLogs() {
+    if (!confirm('Clear all logs? This cannot be undone.')) return;
+    await fetch('/api/logs/clear', { method: 'POST' });
+    allLogs = [];
+    renderLogs();
+    loadStats();
+  }
+
+  loadStats();
+  loadLogs();
+  setInterval(() => { loadStats(); loadLogs(); }, 10000);
+</script>
+</body>
+</html>

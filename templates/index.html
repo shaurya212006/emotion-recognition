@@ -29,11 +29,12 @@
     .logo { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.03em; }
     .logo span { color: var(--accent); }
     nav a {
-      font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem;
-      color: var(--muted); text-decoration: none; margin-left: 2rem;
-      transition: color .2s;
-    }
-    nav a:hover { color: var(--text); }
+      font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem;
+      color: var(--muted); text-decoration: none; padding:.45rem .9rem;
+      border-radius:6px; border:1px solid transparent; transition:all .2s;
+}
+nav a:hover { color: var(--text); border-color: var(--border); }
+nav a.active { color: var(--accent); border-color: var(--accent); background: rgba(240,192,64,.07); }
     .hero {
       max-width: 960px; margin: 0 auto;
       padding: 5rem 2rem 3rem; text-align: center;
@@ -128,8 +129,9 @@
 <header>
   <div class="logo">Emo<span>Scan</span></div>
   <nav>
-    <a href="/">Upload</a>
+    <a href="/" class="active">Upload</a>
     <a href="/webcam">Live Webcam</a>
+    <a href="/records">Records &amp; Logs</a>
   </nav>
 </header>
 
